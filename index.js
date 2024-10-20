@@ -80,7 +80,7 @@ app.post('/extract-code', async (req, res) => {
 });
 
 app.get('/api/dni', async (req, res) => {
-    const { dni } = req.query; // Se espera que el DNI venga en el cuerpo de la solicitud
+    const { dni } = req.query;
 
     if (!dni) {
         return res.status(400).json({ error: 'DNI is required' });
@@ -88,46 +88,57 @@ app.get('/api/dni', async (req, res) => {
 
     try {
         const browser = await puppeteer.launch({
-            headless: true,
+            headless: false, 
             args: ['--no-sandbox', '--disable-setuid-sandbox']
-        }); // Cambia a false si deseas ver el navegador
+        });
         const page = await browser.newPage();
 
-        // Navega a la página del formulario
-        await page.goto('https://eldni.com/pe/buscar-por-dni');
+        // Navegar a la página
+        await page.goto('https://mpv.cofopri.gob.pe/Management/FrmMesaPartesVirtual.aspx', {
+            waitUntil: 'networkidle2',
+            timeout: 10000
+        });
 
-        // Espera a que el input de DNI esté visible
-        await page.waitForSelector('#dni');
+        // Cerrar el modal si aparece
+        await page.waitForSelector('#ModalAviso', { timeout: 5000 }).catch(() => {
+            console.log("No se encontró el modal.");
+        });
+        
+        await page.evaluate(() => {
+            const modal = document.querySelector('#ModalAviso');
+            if (modal) {
+                $(modal).modal('hide');
+            }
+        });
 
-        // Escribe el DNI en el campo de entrada
-        await page.type('#dni', dni);
+        // Escribir el DNI en el campo de entrada
+        await page.waitForSelector('#ContentPlaceHolder1_TxtNroDNI', { timeout: 5000 });
+        await page.type('#ContentPlaceHolder1_TxtNroDNI', dni);
 
-        // Haz clic en el botón de búsqueda
-        await Promise.all([
-            page.click('#btn-buscar-por-dni'),
-            page.waitForNavigation({ waitUntil: 'networkidle0' }) // Espera a que la navegación termine
-        ]);
-        // Espera a que el contenido se cargue
-        await page.waitForSelector('#nombres');
-        await page.waitForSelector('#apellidop');
-        await page.waitForSelector('#apellidom');
+        // Hacer clic en el botón de búsqueda
+        await page.click('#imgBtnSearchDni');
 
-        // Extrae los datos deseados
-        const nombres = await page.$eval('#nombres', el => el.value.trim());
-        const apellidoPaterno = await page.$eval('#apellidop', el => el.value.trim());
-        const apellidoMaterno = await page.$eval('#apellidom', el => el.value.trim());
+        // Esperar a que el valor de apellido materno esté lleno
+        await page.waitForFunction(() => {
+            const apellidoMaternoField = document.querySelector('#ContentPlaceHolder1_TxtApeMaterno');
+            return apellidoMaternoField && apellidoMaternoField.value.trim() !== '';
+        }, { timeout: 10000 });
+
+        // Extraer los resultados
+        const datos = await page.evaluate(() => {
+            const nombres = document.querySelector('#ContentPlaceHolder1_TxtNombres')?.value.trim() || '';
+            const apellidoPaterno = document.querySelector('#ContentPlaceHolder1_TxtApePaterno')?.value.trim() || '';
+            const apellidoMaterno = document.querySelector('#ContentPlaceHolder1_TxtApeMaterno')?.value.trim() || '';
+            return { nombres, apellidoPaterno, apellidoMaterno };
+        });
 
         await browser.close();
 
-        // Devuelve los datos extraídos
-        res.json({
-            nombres,
-            apellidoPaterno,
-            apellidoMaterno
-        });
+        // Retornar los resultados
+        res.json(datos);
     } catch (error) {
         console.error(error);
-        res.status(500).json({ error: 'Failed to scrape data' });
+        res.status(500).json({ error: 'Error al realizar el scraping' });
     }
 });
 
