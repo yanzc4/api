@@ -3,6 +3,20 @@ const puppeteer = require('puppeteer');
 const app = express();
 const port = 3000;
 
+const browser = await puppeteer.launch({
+    headless: "new",
+    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium',
+    args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--no-zygote',
+        '--single-process'
+    ],
+    timeout: 0
+});
+
 app.use(express.json());
 
 app.get('/api/dni', async (req, res) => {
@@ -13,19 +27,6 @@ app.get('/api/dni', async (req, res) => {
     }
 
     try {
-        const browser = await puppeteer.launch({
-            headless: "new",
-            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium',
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-gpu',
-                '--no-zygote',
-                '--single-process'
-            ],
-            timeout: 0
-        });
         const page = await browser.newPage();
 
         // Navegar a la página
