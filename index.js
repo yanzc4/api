@@ -36,29 +36,47 @@ app.get('/api/dni', async (req, res) => {
         const page = await browser.newPage();
 
         // Navegar a la página
-        await page.goto('https://eldni.com/pe/buscar-datos-por-dni');
+        await page.goto('https://mpv.cofopri.gob.pe/Management/FrmMesaPartesVirtual.aspx', {
+            waitUntil: 'networkidle2',
+            timeout: 10000
+        });
+
+        console.log("URL actual:", page.url());
 
         // Cerrar el modal si aparece
-        await page.waitForSelector('#dni');
-        await page.type('#dni', dni);
+        await page.waitForSelector('#ModalAviso', { timeout: 5000 }).catch(() => {
+            console.log("No se encontró el modal.");
+        });
 
-        // Haz clic en el botón de búsqueda
-        await Promise.all([
-            page.click('#btn-buscar-datos-por-dni'),
-            page.waitForNavigation({ waitUntil: 'networkidle0' }) // Espera a que la navegación termine
-        ]);
-        // Extrae los datos deseados
-        const nombres = await page.$eval('#nombres', el => el.textContent.trim());
-        const apellidoPaterno = await page.$eval('#apellidop', el => el.textContent.trim());
-        const apellidoMaterno = await page.$eval('#apellidom', el => el.textContent.trim());
+        await page.evaluate(() => {
+            const modal = document.querySelector('#ModalAviso');
+            if (modal) {
+                $(modal).modal('hide');
+            }
+        });
+
+        // Escribir el DNI en el campo de entrada
+        await page.waitForSelector('#ContentPlaceHolder1_TxtNroDNI', { timeout: 5000 });
+        await page.type('#ContentPlaceHolder1_TxtNroDNI', dni);
+
+        // Hacer clic en el botón de búsqueda
+        await page.click('#imgBtnSearchDni');
+
+        // Esperar a que el valor de apellido materno esté lleno
+        await page.waitForFunction(() => {
+            const apellidoMaternoField = document.querySelector('#ContentPlaceHolder1_TxtApeMaterno');
+            return apellidoMaternoField && apellidoMaternoField.value.trim() !== '';
+        }, { timeout: 10000 });
+
+        // Extraer los resultados
+        const datos = await page.evaluate(() => {
+            const nombres = document.querySelector('#ContentPlaceHolder1_TxtNombres')?.value.trim() || '';
+            const apellidoPaterno = document.querySelector('#ContentPlaceHolder1_TxtApePaterno')?.value.trim() || '';
+            const apellidoMaterno = document.querySelector('#ContentPlaceHolder1_TxtApeMaterno')?.value.trim() || '';
+            return { nombres, apellidoPaterno, apellidoMaterno };
+        });
 
         await page.close();
-
-        const datos = {
-            nombres,
-            apellidoPaterno,
-            apellidoMaterno
-        };
 
         // Retornar los resultados
         res.json(datos);
