@@ -14,9 +14,17 @@ app.get('/api/dni', async (req, res) => {
 
     try {
         const browser = await puppeteer.launch({
-            headless: true,
-            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
-            args: ['--no-sandbox', '--disable-setuid-sandbox']
+            headless: "new",
+            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium',
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-gpu',
+                '--no-zygote',
+                '--single-process'
+            ],
+            timeout: 0
         });
         const page = await browser.newPage();
 
@@ -66,6 +74,17 @@ app.get('/api/dni', async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Error al realizar el scraping' });
+    }
+});
+
+app.get('/test', async (req, res) => {
+    try {
+        const page = await browser.newPage();
+        await page.goto('https://example.com');
+        const title = await page.title();
+        res.send(title);
+    } catch (e) {
+        res.status(500).send(e.message);
     }
 });
 
