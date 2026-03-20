@@ -1,12 +1,10 @@
 const express = require('express');
 const puppeteer = require('puppeteer');
-
-const app = express();
+const app = express(); 
 const port = 3000;
 
 let browser;
 
-// 🚀 Inicializar browser correctamente
 (async () => {
     browser = await puppeteer.launch({
         headless: "new",
@@ -35,89 +33,46 @@ app.get('/api/dni', async (req, res) => {
     }
 
     try {
-        // 🛑 Esperar a que el browser esté listo
-        if (!browser) {
-            return res.status(503).json({ error: 'Browser no listo, intenta nuevamente' });
-        }
-
         const page = await browser.newPage();
 
-        // 🚀 Optimización: bloquear recursos pesados
-        await page.setRequestInterception(true);
-        page.on('request', (req) => {
-            const type = req.resourceType();
-            if (['image', 'stylesheet', 'font'].includes(type)) {
-                req.abort();
-            } else {
-                req.continue();
-            }
-        });
+        // Navegar a la página
+        await page.goto('https://eldni.com/pe/buscar-datos-por-dni');
 
-        // 🧠 Simular navegador real
-        await page.setUserAgent(
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36'
-        );
+        // Cerrar el modal si aparece
+        await page.waitForSelector('#dni');
+        await page.type('#dni', dni);
 
-        console.log("🌐 Cargando página...");
-
-        await page.goto('https://mpv.cofopri.gob.pe/Management/FrmMesaPartesVirtual.aspx', {
-            waitUntil: 'domcontentloaded',
-            timeout: 0
-        });
-
-        // 🧹 eliminar modal sin jQuery (más estable)
-        await page.evaluate(() => {
-            const modal = document.querySelector('#ModalAviso');
-            if (modal) modal.remove();
-        });
-
-        console.log("⌨️ Escribiendo DNI...");
-
-        await page.waitForSelector('#ContentPlaceHolder1_TxtNroDNI', { timeout: 15000 });
-        await page.type('#ContentPlaceHolder1_TxtNroDNI', dni, { delay: 50 });
-
-        await page.click('#imgBtnSearchDni');
-
-        console.log("⏳ Esperando respuesta...");
-
-        await page.waitForFunction(() => {
-            const el = document.querySelector('#ContentPlaceHolder1_TxtApeMaterno');
-            return el && el.value && el.value.trim() !== '';
-        }, { timeout: 20000 });
-
-        const datos = await page.evaluate(() => ({
-            nombres: document.querySelector('#ContentPlaceHolder1_TxtNombres')?.value || '',
-            apellidoPaterno: document.querySelector('#ContentPlaceHolder1_TxtApePaterno')?.value || '',
-            apellidoMaterno: document.querySelector('#ContentPlaceHolder1_TxtApeMaterno')?.value || ''
-        }));
+        // Haz clic en el botón de búsqueda
+        await Promise.all([
+            page.click('#btn-buscar-datos-por-dni'),
+            page.waitForNavigation({ waitUntil: 'networkidle0' }) // Espera a que la navegación termine
+        ]);
+        // Extrae los datos deseados
+        const nombres = await page.$eval('#nombres', el => el.textContent.trim());
+        const apellidoPaterno = await page.$eval('#apellidop', el => el.textContent.trim());
+        const apellidoMaterno = await page.$eval('#apellidom', el => el.textContent.trim());
 
         await page.close();
 
-        res.json({
-            success: true,
-            data: datos
-        });
+        const datos = {
+            nombres,
+            apellidoPaterno,
+            apellidoMaterno
+        };
 
+        // Retornar los resultados
+        res.json(datos);
     } catch (error) {
-        console.error("❌ ERROR:", error);
-
-        res.status(500).json({
-            error: 'Error al realizar el scraping',
-            details: error.message
-        });
+        console.error(error);
+        res.status(500).json({ error: 'Error al realizar el scraping', details: error.message });
     }
 });
 
-// 🧪 endpoint de prueba
 app.get('/test', async (req, res) => {
     try {
-        if (!browser) return res.send("Browser aún iniciando...");
-
         const page = await browser.newPage();
-        await page.goto('https://example.com', { waitUntil: 'domcontentloaded' });
+        await page.goto('https://example.com');
         const title = await page.title();
-        await page.close();
-
         res.send(title);
     } catch (e) {
         res.status(500).send(e.message);
@@ -125,5 +80,5 @@ app.get('/test', async (req, res) => {
 });
 
 app.listen(port, () => {
-    console.log(`🚀 Servidor en http://localhost:${port}`);
+    console.log(`Servidor escuchando en http://localhost:${port}`);
 });
