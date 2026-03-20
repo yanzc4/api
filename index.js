@@ -38,7 +38,7 @@ app.get('/api/dni', async (req, res) => {
         // Navegar a la página
         await page.goto('https://mpv.cofopri.gob.pe/Management/FrmMesaPartesVirtual.aspx', {
             waitUntil: 'networkidle2',
-            timeout: 0
+            timeout: 10000
         });
 
         // Cerrar el modal si aparece
@@ -54,7 +54,7 @@ app.get('/api/dni', async (req, res) => {
         });
 
         // Escribir el DNI en el campo de entrada
-        await page.waitForSelector('#ContentPlaceHolder1_TxtNroDNI', { timeout: 15000 });
+        await page.waitForSelector('#ContentPlaceHolder1_TxtNroDNI', { timeout: 5000 });
         await page.type('#ContentPlaceHolder1_TxtNroDNI', dni);
 
         // Hacer clic en el botón de búsqueda
@@ -64,7 +64,7 @@ app.get('/api/dni', async (req, res) => {
         await page.waitForFunction(() => {
             const apellidoMaternoField = document.querySelector('#ContentPlaceHolder1_TxtApeMaterno');
             return apellidoMaternoField && apellidoMaternoField.value.trim() !== '';
-        }, { timeout: 15000 });
+        }, { timeout: 10000 });
 
         // Extraer los resultados
         const datos = await page.evaluate(() => {
