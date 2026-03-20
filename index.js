@@ -1,21 +1,27 @@
 const express = require('express');
 const puppeteer = require('puppeteer');
-const app = express();
+const app = express(); 
 const port = 3000;
 
-const browser = await puppeteer.launch({
-    headless: "new",
-    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium',
-    args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
-        '--no-zygote',
-        '--single-process'
-    ],
-    timeout: 0
-});
+let browser;
+
+(async () => {
+    browser = await puppeteer.launch({
+        headless: "new",
+        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium',
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+            '--no-zygote',
+            '--single-process'
+        ],
+        timeout: 0
+    });
+
+    console.log("✅ Browser iniciado");
+})();
 
 app.use(express.json());
 
@@ -32,7 +38,7 @@ app.get('/api/dni', async (req, res) => {
         // Navegar a la página
         await page.goto('https://mpv.cofopri.gob.pe/Management/FrmMesaPartesVirtual.aspx', {
             waitUntil: 'networkidle2',
-            timeout: 10000
+            timeout: 0
         });
 
         // Cerrar el modal si aparece
@@ -48,7 +54,7 @@ app.get('/api/dni', async (req, res) => {
         });
 
         // Escribir el DNI en el campo de entrada
-        await page.waitForSelector('#ContentPlaceHolder1_TxtNroDNI', { timeout: 5000 });
+        await page.waitForSelector('#ContentPlaceHolder1_TxtNroDNI', { timeout: 15000 });
         await page.type('#ContentPlaceHolder1_TxtNroDNI', dni);
 
         // Hacer clic en el botón de búsqueda
@@ -58,7 +64,7 @@ app.get('/api/dni', async (req, res) => {
         await page.waitForFunction(() => {
             const apellidoMaternoField = document.querySelector('#ContentPlaceHolder1_TxtApeMaterno');
             return apellidoMaternoField && apellidoMaternoField.value.trim() !== '';
-        }, { timeout: 10000 });
+        }, { timeout: 15000 });
 
         // Extraer los resultados
         const datos = await page.evaluate(() => {
@@ -68,13 +74,13 @@ app.get('/api/dni', async (req, res) => {
             return { nombres, apellidoPaterno, apellidoMaterno };
         });
 
-        await browser.close();
+        await page.close();
 
         // Retornar los resultados
         res.json(datos);
     } catch (error) {
         console.error(error);
-        res.status(500).json({ error: 'Error al realizar el scraping' });
+        res.status(500).json({ error: 'Error al realizar el scraping', details: error.message });
     }
 });
 
