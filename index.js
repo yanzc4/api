@@ -38,7 +38,7 @@ app.get('/api/dni', async (req, res) => {
         // Navegar a la página
         await page.goto('https://mpv.cofopri.gob.pe/Management/FrmMesaPartesVirtual.aspx', {
             waitUntil: 'networkidle2',
-            timeout: 10000
+            timeout: 30000
         });
 
         // Cerrar el modal si aparece
